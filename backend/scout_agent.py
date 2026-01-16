@@ -38,7 +38,7 @@ def analyze_video(video_path):
             model="gemini-3-pro-preview",
             contents=[video_file, prompt],
             config=types.GenerateContentConfig(
-                # THIS IS THE KEY FOR GEMINI 3 HACKATHONS
+                # setting the thinking level to high for better reasoning
                 thinking_config=types.ThinkingConfig(thinking_level="HIGH")
             )
         )

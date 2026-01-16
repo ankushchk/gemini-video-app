@@ -1,6 +1,10 @@
+import json
+import re
+import shutil
+import uvicorn
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import shutil
+from scout_agent import analyze_video
 
 app = FastAPI()
 
@@ -22,14 +26,7 @@ async def upload_video(file: UploadFile = File(...)):
     
     # Analyze video
     try:
-        from scout_agent import analyze_video
         analysis_result = analyze_video(file_location)
-        
-        # Clean up the string to ensure it's valid JSON if needed, or just return it
-        # The prompt asks for JSON, so we expect a JSON string.
-        # Let's try to parse it to ensure it is valid JSON before returning
-        import json
-        import re
         
         # Extract JSON from code blocks if present
         json_match = re.search(r'```json\n(.*?)\n```', analysis_result, re.DOTALL)
@@ -44,5 +41,4 @@ async def upload_video(file: UploadFile = File(...)):
         return {"error": str(e)}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

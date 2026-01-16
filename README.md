@@ -1,8 +1,8 @@
-# Gemini Video App 🎥
+# Gemini Video App (initial prototype)
 
 An AI-powered tool that identifies viral hooks in long-form videos using Gemini 1.5 Pro with Reasoning (High Thinking).
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Backend Setup (Python)
 ```bash
@@ -32,7 +32,7 @@ npm run dev
 2. Upload a video file.
 3. Wait for the Gemini "Scout" agent to analyze the video and generate viral clips.
 
-## 🛠 Tech Stack
+## Tech Stack
 - **Frontend**: React, Vite, TailwindCSS, Lucide Icons.
 - **Backend**: FastAPI, Google GenAI SDK (Gemini 1.5 Pro).
 - **Thinking**: Uses Gemini 1.5 Pro's Reasoning capabilities for deep video analysis.
