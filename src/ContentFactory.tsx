@@ -1,91 +1,160 @@
-import React, { useState, type ChangeEvent } from 'react';
-import { Upload, TrendingUp, Clock } from 'lucide-react';
-
-interface Clip {
-  id: number;
-  thumbnail: string;
-  viralScore: number;
-  duration: number;
-  hook: string;
-}
+import { useState, type ChangeEvent } from 'react';
+import { Upload, TrendingUp, Clock, FileText, User, MessageSquare, Sparkles } from 'lucide-react';
+import type { PodcastAnalysisResult, PodcastClip, PodcastMetadata } from './types';
+import ClipDetailView from './ClipDetailView';
 
 export default function ContentFactory() {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [progress, setProgress] = useState<number>(0);
-  const [clips, setClips] = useState<Clip[]>([]);
+  const [currentStage, setCurrentStage] = useState<number>(0);
+  const [clips, setClips] = useState<PodcastClip[]>([]);
+  const [selectedClip, setSelectedClip] = useState<PodcastClip | null>(null);
+  const [metadata, setMetadata] = useState<PodcastMetadata>({
+    guest: '',
+    topic: '',
+    tone: ''
+  });
+
+  const stages = [
+    'Semantic Chunking',
+    'Viral Analysis',
+    'Clip Refinement',
+    'Platform Optimization',
+    'Visual Treatment',
+    'Assembly Specs'
+  ];
 
   const handleUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Check file type
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!ext || !['txt', 'srt', 'vtt'].includes(ext)) {
+      alert('Please upload a transcript file (.txt, .srt, or .vtt)');
+      return;
+    }
+
     setIsAnalyzing(true);
-    setProgress(0);
+    setCurrentStage(0);
     setClips([]);
 
     const formData = new FormData();
     formData.append('file', file);
+    
+    // Add metadata if provided
+    if (metadata.guest) formData.append('guest', metadata.guest);
+    if (metadata.topic) formData.append('topic', metadata.topic);
+    if (metadata.tone) formData.append('tone', metadata.tone);
 
     try {
-      // Simulate progress while waiting for backend
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 1, 90));
-      }, 500);
+      // Simulate stage progression
+      const stageInterval = setInterval(() => {
+        setCurrentStage(prev => Math.min(prev + 1, 5));
+      }, 2000);
 
-      const response = await fetch('http://localhost:8000/upload-video', {
+      const response = await fetch('http://localhost:8000/analyze-podcast', {
         method: 'POST',
         body: formData,
       });
 
-      clearInterval(progressInterval);
-      setProgress(100);
+      clearInterval(stageInterval);
+      setCurrentStage(6);
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        throw new Error('Analysis failed');
       }
 
-      const data = await response.json();
+      const data: PodcastAnalysisResult = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
       console.log('Analysis result:', data);
       
-      // Assumption: data is a list of objects or has a key with the list
-      // Based on scout_agent prompt, it returns a JSON object. We expect it to key "hooks" or be an array.
-      // Let's assume the prompt returns an array of objects directly or wrapped.
-      // We'll inspect the data structure. If it's pure JSON array from the prompt:
-      
-      const hooks = Array.isArray(data) ? data : (data.hooks || []);
-      
-      const newClips: Clip[] = hooks.map((hook: any, index: number) => ({
-        id: index + 1,
-        thumbnail: `https://picsum.photos/seed/${index + 1}/400/600`, // Placeholder
-        viralScore: hook['Viral Score'] || hook.viralScore || 0,
-        duration: 15, // Default or calculate from timestamps if available
-        hook: hook['reason'] || hook.reason || 'No description'
-      }));
-
-      setClips(newClips.sort((a, b) => b.viralScore - a.viralScore));
+      // Sort clips by viral score
+      const sortedClips = (data.selected_clips || []).sort((a, b) => b.viral_score - a.viral_score);
+      setClips(sortedClips);
 
     } catch (error) {
-      console.error('Error uploading video:', error);
-      alert('Failed to analyze video');
+      console.error('Error analyzing podcast:', error);
+      alert(`Failed to analyze podcast: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsAnalyzing(false);
+      setCurrentStage(0);
     }
   };
 
-  // Removed generateClips as it is now handled in handleUpload
-
-
-
   const getScoreColor = (score: number): string => {
-    if (score >= 90) return 'text-green-500';
-    if (score >= 75) return 'text-yellow-500';
+    if (score >= 0.9) return 'text-green-500';
+    if (score >= 0.75) return 'text-yellow-500';
     return 'text-orange-500';
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       {/* Header */}
       <div className="border-b border-neutral-800 px-6 py-4">
-        <h1 className="text-xl font-light tracking-wide">Content Factory</h1>
+        <div className="flex items-center gap-3">
+          <Sparkles className="w-6 h-6 text-purple-500" />
+          <h1 className="text-xl font-light tracking-wide">Podcast Content Analyzer</h1>
+        </div>
+        <p className="text-sm text-neutral-500 mt-1">Transform podcasts into viral short-form content</p>
+      </div>
+
+      {/* Metadata Form */}
+      <div className="px-6 py-6 border-b border-neutral-800">
+        <h2 className="text-sm text-neutral-400 mb-4">Optional Metadata (improves analysis)</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="flex items-center gap-2 text-xs text-neutral-500 mb-2">
+              <User className="w-3 h-3" />
+              Guest Name
+            </label>
+            <input
+              type="text"
+              value={metadata.guest}
+              onChange={(e) => setMetadata({ ...metadata, guest: e.target.value })}
+              placeholder="e.g., Elon Musk"
+              className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-neutral-700"
+              disabled={isAnalyzing}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-xs text-neutral-500 mb-2">
+              <MessageSquare className="w-3 h-3" />
+              Topic
+            </label>
+            <input
+              type="text"
+              value={metadata.topic}
+              onChange={(e) => setMetadata({ ...metadata, topic: e.target.value })}
+              placeholder="e.g., Artificial Intelligence"
+              className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-neutral-700"
+              disabled={isAnalyzing}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-xs text-neutral-500 mb-2">
+              <FileText className="w-3 h-3" />
+              Tone
+            </label>
+            <input
+              type="text"
+              value={metadata.tone}
+              onChange={(e) => setMetadata({ ...metadata, tone: e.target.value })}
+              placeholder="e.g., Serious, thought-provoking"
+              className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-neutral-700"
+              disabled={isAnalyzing}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Upload Section */}
@@ -93,7 +162,7 @@ export default function ContentFactory() {
         <label className="block">
           <input
             type="file"
-            accept="video/*"
+            accept=".txt,.srt,.vtt"
             onChange={handleUpload}
             className="hidden"
             disabled={isAnalyzing}
@@ -101,23 +170,38 @@ export default function ContentFactory() {
           <div className="border-2 border-dashed border-neutral-800 rounded-lg p-12 cursor-pointer hover:border-neutral-700 transition-colors flex flex-col items-center gap-3">
             <Upload className="w-8 h-8 text-neutral-600" />
             <span className="text-sm text-neutral-500">
-              {isAnalyzing ? 'Analyzing...' : 'Upload long-form video'}
+              {isAnalyzing ? 'Analyzing transcript...' : 'Upload podcast transcript (.txt, .srt, .vtt)'}
             </span>
+            {!isAnalyzing && (
+              <span className="text-xs text-neutral-700">
+                Supports plain text, SRT, and VTT formats with speaker labels
+              </span>
+            )}
           </div>
         </label>
 
-        {/* Progress Bar */}
+        {/* Stage Progress */}
         {isAnalyzing && (
           <div className="mt-6">
-            <div className="flex justify-between text-xs text-neutral-500 mb-2">
-              <span>Processing</span>
-              <span>{progress}%</span>
+            <div className="flex justify-between text-xs text-neutral-500 mb-3">
+              <span>Processing Stages</span>
+              <span>{currentStage}/6</span>
             </div>
-            <div className="h-1 bg-neutral-900 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-white transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
+            <div className="space-y-2">
+              {stages.map((stage, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${
+                    idx < currentStage ? 'bg-green-500' : 
+                    idx === currentStage ? 'bg-yellow-500 animate-pulse' : 
+                    'bg-neutral-800'
+                  }`} />
+                  <span className={`text-xs ${
+                    idx <= currentStage ? 'text-neutral-300' : 'text-neutral-700'
+                  }`}>
+                    {idx + 1}. {stage}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -126,40 +210,73 @@ export default function ContentFactory() {
       {/* Clips Grid */}
       {clips.length > 0 && (
         <div className="px-6 pb-8">
-          <div className="flex items-center gap-2 mb-6">
-            <span className="text-sm text-neutral-500">Generated Clips</span>
-            <span className="text-xs text-neutral-700">{clips.length}</span>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-500">Viral Clips</span>
+              <span className="text-xs text-neutral-700">{clips.length}</span>
+            </div>
+            <div className="text-xs text-neutral-600">
+              Sorted by viral potential
+            </div>
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {clips.map((clip) => (
               <div 
-                key={clip.id}
-                className="group cursor-pointer"
+                key={clip.clip_id}
+                onClick={() => setSelectedClip(clip)}
+                className="group cursor-pointer bg-neutral-900 rounded-lg overflow-hidden border border-neutral-800 hover:border-neutral-700 transition-all"
               >
-                <div className="relative aspect-[9/16] bg-neutral-900 rounded-lg overflow-hidden mb-2">
-                  <img 
-                    src={clip.thumbnail} 
-                    alt={`Clip ${clip.id}`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="absolute bottom-2 left-2 right-2">
-                      <p className="text-xs text-white/90">{clip.hook}</p>
+                {/* Clip Header */}
+                <div className="p-4 border-b border-neutral-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-neutral-600">{clip.clip_id}</span>
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3 text-neutral-600" />
+                      <span className={`text-sm font-medium ${getScoreColor(clip.viral_score)}`}>
+                        {(clip.viral_score * 100).toFixed(0)}%
+                      </span>
                     </div>
                   </div>
-                  <div className="absolute top-2 right-2 bg-black/70 px-1.5 py-0.5 rounded text-xs flex items-center gap-1">
+                  <div className="flex items-center gap-2 text-xs text-neutral-500">
                     <Clock className="w-3 h-3" />
-                    {clip.duration}s
+                    <span>{formatTime(clip.refined_start)} - {formatTime(clip.refined_end)}</span>
+                    <span>•</span>
+                    <span>{clip.refined_duration}s</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-neutral-600">#{clip.id}</span>
-                  <div className="flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3 text-neutral-600" />
-                    <span className={`text-xs font-medium ${getScoreColor(clip.viralScore)}`}>
-                      {clip.viralScore}
-                    </span>
+
+                {/* Hook Preview */}
+                <div className="p-4">
+                  <div className="text-xs text-neutral-600 mb-2">Hook:</div>
+                  <p className="text-sm text-white line-clamp-2 group-hover:text-purple-400 transition-colors">
+                    {clip.hook}
+                  </p>
+                </div>
+
+                {/* Metadata Preview */}
+                <div className="p-4 pt-0 space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    {clip.hashtags.slice(0, 3).map((tag, idx) => (
+                      <span key={idx} className="text-xs bg-neutral-800 px-2 py-0.5 rounded text-blue-400">
+                        {tag}
+                      </span>
+                    ))}
+                    {clip.hashtags.length > 3 && (
+                      <span className="text-xs text-neutral-600">
+                        +{clip.hashtags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-neutral-600">
+                    {clip.visual_beats.length} visual beats • {clip.captions.length} captions
+                  </div>
+                </div>
+
+                {/* View Details Button */}
+                <div className="p-4 pt-0">
+                  <div className="text-xs text-purple-500 group-hover:text-purple-400 transition-colors">
+                    Click to view full details →
                   </div>
                 </div>
               </div>
@@ -171,8 +288,16 @@ export default function ContentFactory() {
       {/* Empty State */}
       {clips.length === 0 && !isAnalyzing && (
         <div className="px-6 py-16 text-center">
-          <p className="text-neutral-700 text-sm">Upload a video to generate clips</p>
+          <p className="text-neutral-700 text-sm">Upload a podcast transcript to generate viral clips</p>
         </div>
+      )}
+
+      {/* Clip Detail Modal */}
+      {selectedClip && (
+        <ClipDetailView 
+          clip={selectedClip} 
+          onClose={() => setSelectedClip(null)} 
+        />
       )}
     </div>
   );
