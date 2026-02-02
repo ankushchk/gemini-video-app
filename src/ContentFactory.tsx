@@ -29,8 +29,8 @@ export default function ContentFactory() {
 
     // Check file type
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!ext || !['txt', 'srt', 'vtt'].includes(ext)) {
-      alert('Please upload a transcript file (.txt, .srt, or .vtt)');
+    if (!ext || !['txt', 'srt', 'vtt', 'mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
+      alert('Please upload a transcript (.txt, .srt, .vtt) or video file (.mp4, .mov, .avi)');
       return;
     }
 
@@ -50,9 +50,15 @@ export default function ContentFactory() {
       // Simulate stage progression
       const stageInterval = setInterval(() => {
         setCurrentStage(prev => Math.min(prev + 1, 5));
-      }, 2000);
+      }, 3000); // Slower progress for potentially larger video files
 
-      const response = await fetch('http://localhost:8000/analyze-podcast', {
+      // Determine endpoint based on file type
+      const isVideo = ['mp4', 'mov', 'avi', 'mkv'].includes(ext);
+      const endpoint = isVideo 
+        ? 'http://localhost:8000/upload-video' 
+        : 'http://localhost:8000/analyze-podcast';
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       });
@@ -77,8 +83,8 @@ export default function ContentFactory() {
       setClips(sortedClips);
 
     } catch (error) {
-      console.error('Error analyzing podcast:', error);
-      alert(`Failed to analyze podcast: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error analyzing content:', error);
+      alert(`Failed to analyze content: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsAnalyzing(false);
       setCurrentStage(0);
@@ -105,7 +111,7 @@ export default function ContentFactory() {
           <Sparkles className="w-6 h-6 text-purple-500" />
           <h1 className="text-xl font-light tracking-wide">Podcast Content Analyzer</h1>
         </div>
-        <p className="text-sm text-neutral-500 mt-1">Transform podcasts into viral short-form content</p>
+        <p className="text-sm text-neutral-500 mt-1">Transform podcasts and videos into viral short-form content</p>
       </div>
 
       {/* Metadata Form */}
@@ -162,7 +168,7 @@ export default function ContentFactory() {
         <label className="block">
           <input
             type="file"
-            accept=".txt,.srt,.vtt"
+            accept=".txt,.srt,.vtt,.mp4,.mov,.avi,.mkv"
             onChange={handleUpload}
             className="hidden"
             disabled={isAnalyzing}
@@ -170,11 +176,11 @@ export default function ContentFactory() {
           <div className="border-2 border-dashed border-neutral-800 rounded-lg p-12 cursor-pointer hover:border-neutral-700 transition-colors flex flex-col items-center gap-3">
             <Upload className="w-8 h-8 text-neutral-600" />
             <span className="text-sm text-neutral-500">
-              {isAnalyzing ? 'Analyzing transcript...' : 'Upload podcast transcript (.txt, .srt, .vtt)'}
+              {isAnalyzing ? 'Analyzing content...' : 'Upload transcript (.txt, .srt) or video (.mp4)'}
             </span>
             {!isAnalyzing && (
               <span className="text-xs text-neutral-700">
-                Supports plain text, SRT, and VTT formats with speaker labels
+                Supports transcripts (TXT, SRT, VTT) and videos (MP4, MOV, AVI)
               </span>
             )}
           </div>

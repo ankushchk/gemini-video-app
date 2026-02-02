@@ -2,10 +2,11 @@ import json
 import re
 import shutil
 import uvicorn
+import os
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
-from scout_agent import analyze_video
+from video_analyzer import analyze_video_file
 from transcript_parser import parse_transcript
 from podcast_analyzer import analyze_podcast
 
@@ -22,26 +23,29 @@ app.add_middleware(
 
 @app.post("/upload-video")
 async def upload_video(file: UploadFile = File(...)):
-    """Legacy endpoint for video analysis"""
-    # Save the file locally so the Gemini Agent can 'Scout' it later
+    """
+    Multimodal Video Analysis Endpoint
+    Uses Gemini 2.5 Flash to watch and analyze video directly.
+    """
+    # Save the file locally
     file_location = f"temp_{file.filename}"
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    print(f"Receiving video upload: {file.filename}")
     
-    # Analyze video
     try:
-        analysis_result = analyze_video(file_location)
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
         
-        # Extract JSON from code blocks if present
-        json_match = re.search(r'```json\n(.*?)\n```', analysis_result, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            json_str = analysis_result
+        # Analyze video using new module
+        result = analyze_video_file(file_location)
+        
+        # Clean up temp file
+        if os.path.exists(file_location):
+            os.remove(file_location)
             
-        data = json.loads(json_str)
-        return data
+        return result
+        
     except Exception as e:
+        print(f"Error in upload_video: {e}")
         return {"error": str(e)}
 
 

@@ -17,8 +17,9 @@ An AI-powered tool that transforms podcast transcripts into viral short-form vid
 6. **Assembly Specification** - Provides technical build instructions for video editors
 
 ### Key Capabilities
+- **Multimodal Video Analysis**: Direct upload of `.mp4`, `.mov` files. Gemini "watches" the video to find viral moments.
 - **High-Speed Analysis**: Powered by Gemini 2.5 Flash for rapid processing.
-- **Multi-Format Support**: Handles .txt, .srt, and .vtt transcript files.
+- **Multi-Format Support**: Handles video files AND .txt, .srt, .vtt transcript files.
 - **Deep Editorial Context**: Accepts guest, topic, and tone metadata.
 - **Visual Blueprint**: Exports a complete JSON "recipe" for video editors (compatible with automation tools).
 
@@ -52,10 +53,11 @@ npm run dev
 ### 3. Usage
 1. Open `http://localhost:5173`
 2. (Optional) Enter metadata: guest name, topic, tone
-3. Upload a podcast transcript (.txt, .srt, or .vtt)
-4. Wait for the 6-stage analysis to complete
-5. Review viral clips sorted by viral score
-6. Click any clip to view full details and export JSON
+3. **Upload Video**: Drag & drop an `.mp4` file to analyze visual & audio cues directly.
+4. **OR Upload Transcript**: Upload a .txt, .srt, or .vtt file.
+5. Wait for the analysis to complete
+6. Review viral clips sorted by viral score
+7. Click any clip to view full details and export JSON
 
 ## Troubleshooting
 
@@ -100,11 +102,9 @@ Elon Musk: Absolutely. I think AI is the most important thing...
 ### POST /analyze-podcast
 Analyzes podcast transcript through 6-stage pipeline.
 
-**Parameters:**
-- `file` (required): Transcript file (.txt, .srt, .vtt)
-- `guest` (optional): Guest name
-- `topic` (optional): Podcast topic
-- `tone` (optional): Conversation tone
+### POST /upload-video
+**[NEW]** Direct video analysis using Multimodal Gemini 2.5.
+- `file` (required): Video file (.mp4, .mov, etc.)
 
 **Response:**
 ```json
@@ -127,7 +127,7 @@ Analyzes podcast transcript through 6-stage pipeline.
 ## Tech Stack
 - **Frontend**: React, TypeScript, Vite, TailwindCSS, Lucide Icons
 - **Backend**: FastAPI, Python, Google GenAI SDK
-- **AI**: Gemini 2.5 Flash for rapid, accurate content analysis
+- **AI**: Gemini 2.5 Flash (Multimodal Video & Text Analysis)
 
 ## Sample Data
 
@@ -137,9 +137,9 @@ Analyzes podcast transcript through 6-stage pipeline.
 gemini-video-app/
 ├── backend/                 # Python FastAPI Backend
 │   ├── main.py             # API Entry point & formatting
-│   ├── podcast_analyzer.py # Core Gemini 2.5 Flash logic (6-stage pipeline)
+│   ├── podcast_analyzer.py # Text-based 6-stage pipeline
+│   ├── video_analyzer.py   # [NEW] Multimodal Video Analysis pipeline
 │   ├── transcript_parser.py # Normalizes .txt/.srt/.vtt files
-│   ├── scout_agent.py      # (Legacy) Video file analysis
 │   └── requirements.txt    # Python dependencies
 ├── src/                    # React Frontend
 │   ├── ContentFactory.tsx  # Main dashboard component
@@ -153,7 +153,8 @@ gemini-video-app/
 
 - [x] **Core Analysis Engine**: 6-stage pipeline using Gemini 2.5 Flash.
 - [x] **Smart Parsing**: Support for multiple timestamp formats.
-- [ ] **Video Upload Support**: Direct video processing (skipping manual transcript).
+- [x] **Video Upload Support**: Direct video processing using Gemini Multimodal capabilities.
+- [ ] **Creative Autopilot**: Image generation for B-roll (Pending Quota/Model Availability).
 - [ ] **One-Click Export**: Generate `.mp4` clips using FFmpeg on the backend.
 - [ ] **Social Integration**: Direct publishing to TikTok/Instagram APIs.
 

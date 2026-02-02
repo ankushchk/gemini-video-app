@@ -25,11 +25,11 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
         {/* Header */}
         <div className="sticky top-0 bg-neutral-900 border-b border-neutral-800 p-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl font-light">{clip.clip_id}</h2>
+            <h2 className="text-xl font-light">{clip?.clip_id || 'Unknown Clip'}</h2>
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-neutral-600" />
-              <span className={`text-sm font-medium ${getScoreColor(clip.viral_score)}`}>
-                {(clip.viral_score * 100).toFixed(0)}%
+              <span className={`text-sm font-medium ${getScoreColor(clip?.viral_score || 0)}`}>
+                {((clip?.viral_score || 0) * 100).toFixed(0)}%
               </span>
             </div>
           </div>
@@ -47,29 +47,29 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
           <div className="flex items-center gap-4 text-sm text-neutral-400">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              <span>{formatTime(clip.refined_start)} - {formatTime(clip.refined_end)}</span>
+              <span>{formatTime(clip?.refined_start || 0)} - {formatTime(clip?.refined_end || 0)}</span>
             </div>
             <span>•</span>
-            <span>{clip.refined_duration}s</span>
+            <span>{clip?.refined_duration || 0}s</span>
           </div>
 
           {/* Hook */}
           <div>
             <h3 className="text-sm text-neutral-500 mb-2">Hook (First 3 seconds)</h3>
-            <p className="text-lg font-medium text-white">{clip.hook}</p>
+            <p className="text-lg font-medium text-white">{clip?.hook || 'No hook detected'}</p>
           </div>
 
           {/* Reasoning */}
           <div>
             <h3 className="text-sm text-neutral-500 mb-2">Why This Will Go Viral</h3>
-            <p className="text-neutral-300">{clip.reasoning}</p>
+            <p className="text-neutral-300">{clip?.reasoning || 'No analysis available'}</p>
           </div>
 
           {/* Captions */}
           <div>
             <h3 className="text-sm text-neutral-500 mb-3">On-Screen Captions</h3>
             <div className="space-y-2">
-              {clip.captions.map((caption, idx) => (
+              {(clip?.captions || []).map((caption, idx) => (
                 <div key={idx} className="bg-neutral-800/50 rounded p-3">
                   <div className="text-sm text-neutral-400 mb-1">
                     {formatTime(caption.start_offset)} - {formatTime(caption.end_offset)}
@@ -78,7 +78,7 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
                     {caption.text.split(' ').map((word, wordIdx) => (
                       <span
                         key={wordIdx}
-                        className={caption.emphasis.some(e => word.includes(e)) ? 'font-bold text-yellow-400' : ''}
+                        className={(caption.emphasis || []).some(e => word.includes(e)) ? 'font-bold text-yellow-400' : ''}
                       >
                         {word}{' '}
                       </span>
@@ -86,6 +86,9 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
                   </div>
                 </div>
               ))}
+              {(!clip?.captions || clip.captions.length === 0) && (
+                <p className="text-sm text-neutral-500 italic">No captions generated.</p>
+              )}
             </div>
           </div>
 
@@ -93,7 +96,7 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h3 className="text-sm text-neutral-500 mb-2">Reel Caption</h3>
-              <p className="text-neutral-300 text-sm">{clip.reel_caption}</p>
+              <p className="text-neutral-300 text-sm">{clip?.reel_caption || 'No caption generated'}</p>
             </div>
             <div>
               <h3 className="text-sm text-neutral-500 mb-2 flex items-center gap-2">
@@ -101,7 +104,7 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
                 Hashtags
               </h3>
               <div className="flex flex-wrap gap-2">
-                {clip.hashtags.map((tag, idx) => (
+                {(clip?.hashtags || []).map((tag, idx) => (
                   <span key={idx} className="text-xs bg-neutral-800 px-2 py-1 rounded text-blue-400">
                     {tag}
                   </span>
@@ -114,11 +117,11 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
           <div className="grid grid-cols-2 gap-4 p-4 bg-neutral-800/30 rounded-lg">
             <div>
               <div className="text-xs text-neutral-500 mb-1">Pacing</div>
-              <div className="text-sm text-white capitalize">{clip.tone.pacing}</div>
+              <div className="text-sm text-white capitalize">{clip?.tone?.pacing || 'N/A'}</div>
             </div>
             <div>
               <div className="text-xs text-neutral-500 mb-1">Music Vibe</div>
-              <div className="text-sm text-white capitalize">{clip.tone.music_vibe}</div>
+              <div className="text-sm text-white capitalize">{clip?.tone?.music_vibe || 'N/A'}</div>
             </div>
           </div>
 
@@ -129,7 +132,7 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
               Visual Treatment Plan
             </h3>
             <div className="space-y-3">
-              {clip.visual_beats.map((beat, idx) => (
+              {(clip?.visual_beats || []).map((beat, idx) => (
                 <div key={idx} className="bg-neutral-800/50 rounded-lg p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="text-sm font-medium text-white">Beat {idx + 1}</div>
@@ -157,6 +160,9 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
                   </div>
                 </div>
               ))}
+               {(!clip?.visual_beats || clip.visual_beats.length === 0) && (
+                <p className="text-sm text-neutral-500 italic">No visual beats planned.</p>
+              )}
             </div>
           </div>
 
@@ -167,7 +173,7 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
               <div>
                 <div className="text-xs text-neutral-500 mb-2">Color Palette</div>
                 <div className="flex gap-2">
-                  {clip.style.color_palette.map((color, idx) => (
+                  {(clip?.style?.color_palette || []).map((color, idx) => (
                     <div key={idx} className="flex items-center gap-2">
                       <div
                         className="w-8 h-8 rounded border border-neutral-700"
@@ -180,11 +186,11 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
               </div>
               <div>
                 <div className="text-xs text-neutral-500 mb-1">Typography</div>
-                <div className="text-sm text-neutral-300">{clip.style.typography}</div>
+                <div className="text-sm text-neutral-300">{clip?.style?.typography || 'N/A'}</div>
               </div>
               <div>
                 <div className="text-xs text-neutral-500 mb-1">Composition</div>
-                <div className="text-sm text-neutral-300 capitalize">{clip.style.composition}</div>
+                <div className="text-sm text-neutral-300 capitalize">{clip?.style?.composition || 'N/A'}</div>
               </div>
             </div>
           </div>
@@ -199,27 +205,27 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div>
                   <div className="text-xs text-neutral-500 mb-1">Resolution</div>
-                  <div className="text-neutral-300">{clip.assembly_spec.resolution}</div>
+                  <div className="text-neutral-300">{clip?.assembly_spec?.resolution || 'N/A'}</div>
                 </div>
                 <div>
                   <div className="text-xs text-neutral-500 mb-1">Aspect Ratio</div>
-                  <div className="text-neutral-300">{clip.assembly_spec.aspect_ratio}</div>
+                  <div className="text-neutral-300">{clip?.assembly_spec?.aspect_ratio || 'N/A'}</div>
                 </div>
                 <div>
                   <div className="text-xs text-neutral-500 mb-1">FPS</div>
-                  <div className="text-neutral-300">{clip.assembly_spec.fps}</div>
+                  <div className="text-neutral-300">{clip?.assembly_spec?.fps || 'N/A'}</div>
                 </div>
                 <div>
                   <div className="text-xs text-neutral-500 mb-1">Video Codec</div>
-                  <div className="text-neutral-300">{clip.assembly_spec.video_codec}</div>
+                  <div className="text-neutral-300">{clip?.assembly_spec?.video_codec || 'N/A'}</div>
                 </div>
                 <div>
                   <div className="text-xs text-neutral-500 mb-1">Audio Format</div>
-                  <div className="text-neutral-300">{clip.assembly_spec.audio_format}</div>
+                  <div className="text-neutral-300">{clip?.assembly_spec?.audio_format || 'N/A'}</div>
                 </div>
                 <div>
                   <div className="text-xs text-neutral-500 mb-1">Transition</div>
-                  <div className="text-neutral-300 capitalize">{clip.assembly_spec.image_transition}</div>
+                  <div className="text-neutral-300 capitalize">{clip?.assembly_spec?.image_transition || 'N/A'}</div>
                 </div>
               </div>
             </div>
@@ -233,7 +239,7 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
               const url = URL.createObjectURL(dataBlob);
               const link = document.createElement('a');
               link.href = url;
-              link.download = `${clip.clip_id}_spec.json`;
+              link.download = `${clip?.clip_id || 'clip'}_spec.json`;
               link.click();
               URL.revokeObjectURL(url);
             }}
