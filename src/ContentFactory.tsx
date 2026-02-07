@@ -23,6 +23,62 @@ export default function ContentFactory() {
     'Assembly Specs'
   ];
 
+  const handleYoutubeSubmit = async (url: string) => {
+    setIsAnalyzing(true);
+    setCurrentStage(0);
+    setClips([]);
+
+    try {
+      // Simulate stage progression
+      const stageInterval = setInterval(() => {
+        setCurrentStage(prev => Math.min(prev + 1, 5));
+      }, 2000);
+
+      const response = await fetch('http://localhost:8000/analyze-youtube', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          video_url: url,
+          guest: metadata.guest,
+          topic: metadata.topic,
+          tone: metadata.tone
+        }),
+      });
+
+      clearInterval(stageInterval);
+      setCurrentStage(6);
+
+      if (!response.ok) {
+        throw new Error('Analysis failed');
+      }
+
+      const data: PodcastAnalysisResult = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      console.log('Analysis result:', data);
+      
+      const sortedClips = (data.selected_clips || [])
+        .sort((a, b) => b.viral_score - a.viral_score)
+        .map(clip => ({
+          ...clip,
+          source_file: data.source_file || url // Use URL if no source file
+        }));
+      setClips(sortedClips);
+
+    } catch (error) {
+      console.error('Error analyzing content:', error);
+      alert(`Failed to analyze content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsAnalyzing(false);
+      setCurrentStage(0);
+    }
+  };
+
   const handleUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -190,6 +246,39 @@ export default function ContentFactory() {
             )}
           </div>
         </label>
+
+        {/* OR Divider */}
+        <div className="flex items-center gap-4 my-6">
+          <div className="h-px bg-neutral-800 flex-1" />
+          <span className="text-xs text-neutral-600 font-medium">OR USE YOUTUBE</span>
+          <div className="h-px bg-neutral-800 flex-1" />
+        </div>
+
+        {/* YouTube Input */}
+        <div className="flex gap-2">
+           <input
+              type="text"
+              placeholder="Paste YouTube URL here..."
+              className="flex-1 bg-neutral-900 border border-neutral-800 rounded px-4 py-3 text-sm focus:outline-none focus:border-red-600 transition-colors"
+              disabled={isAnalyzing}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const url = e.currentTarget.value;
+                  if (url) handleYoutubeSubmit(url);
+                }
+              }}
+           />
+           <button 
+             className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+             disabled={isAnalyzing}
+             onClick={(e) => {
+               const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+               if (input.value) handleYoutubeSubmit(input.value);
+             }}
+           >
+             Analyze
+           </button>
+        </div>
 
         {/* Stage Progress */}
         {isAnalyzing && (

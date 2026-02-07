@@ -6,6 +6,7 @@ import os
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
+from pydantic import BaseModel
 from video_analyzer import analyze_video_file
 from transcript_parser import parse_transcript
 from podcast_analyzer import analyze_podcast
@@ -143,6 +144,61 @@ async def analyze_podcast_endpoint(
         print(f"Error in analyze_podcast_endpoint: {e}")
         import traceback
         traceback.print_exc()
+        return {"error": str(e)}
+
+
+
+from youtube_helper import get_youtube_transcript
+
+class YouTubeRequest(BaseModel):
+    video_url: str
+    guest: Optional[str] = None
+    topic: Optional[str] = None
+    tone: Optional[str] = None
+
+@app.post("/analyze-youtube")
+async def analyze_youtube_endpoint(request: YouTubeRequest):
+    """
+    Analyzes a YouTube video by fetching its transcript.
+    """
+    try:
+        print(f"Fetching transcript for: {request.video_url}")
+        transcript = get_youtube_transcript(request.video_url)
+        
+        # Convert transcript format from youtube-api to our format
+        # yt-api: [{'text': '...', 'start': 0.0, 'duration': 1.0}, ...]
+        # our format: same structure is fine as long as keys match
+        
+        transcript_entries = [
+            {
+                "text": entry["text"],
+                "start_time": entry["start"],
+                "end_time": entry["start"] + entry["duration"],
+                "speaker": "Speaker" # Default speaker since YouTube doesn't provide speaker diarization
+            }
+            for entry in transcript
+        ]
+        
+        print(f"Fetched {len(transcript_entries)} transcript entries")
+        
+        # Build metadata
+        metadata = {}
+        if request.guest:
+            metadata['guest'] = request.guest
+        if request.topic:
+            metadata['topic'] = request.topic
+        if request.tone:
+            metadata['tone'] = request.tone
+            
+        metadata['source_url'] = request.video_url
+        
+        # Analyze podcast
+        result = analyze_podcast(transcript_entries, metadata if metadata else None)
+        
+        return result
+
+    except Exception as e:
+        print(f"Error in analyze_youtube: {e}")
         return {"error": str(e)}
 
 
