@@ -1,9 +1,12 @@
 """
 Podcast Analyzer - 6-Stage Analysis Pipeline
-Uses Gemini 3 Pro with HIGH thinking for deep editorial reasoning
+Uses Gemini 3 Flash Preview (latest) with native Structured Outputs for reliability
 """
 import os
 import json
+from enum import Enum
+from typing import List, Optional
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -15,14 +18,89 @@ load_dotenv()
 # Setup Gemini Client
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+# --- Pydantic Models for Structured Output ---
+
+class Segment(BaseModel):
+    chunk_id: str
+    start_time: float
+    end_time: float
+    duration: float
+    speakers: List[str]
+    summary: str
+
+class AnalysisMetrics(BaseModel):
+    chunk_id: str
+    viral_score: float = Field(..., description="0.0 to 1.0 score indicating viral potential")
+    editorial_reasoning: str
+    context_dependency: bool
+    emotional_peak: Optional[str] = None
+    quotability: Optional[str] = None
+    platform_fit: Optional[str] = None
+
+class Caption(BaseModel):
+    text: str
+    start_offset: float
+    end_offset: float
+    emphasis: List[str]
+
+class VisualBeat(BaseModel):
+    image_concept: str
+    text_overlay: Optional[str] = None
+    motion: str
+    motion_intensity: int
+    duration: int
+
+class Tone(BaseModel):
+    pacing: str
+    music_vibe: str
+
+class Style(BaseModel):
+    color_palette: List[str]
+    typography: str
+    composition: str
+
+class AssemblySpec(BaseModel):
+    aspect_ratio: str = "9:16"
+    resolution: str = "1080x1920"
+    fps: int = 30
+    audio_format: str = "AAC"
+    video_codec: str = "H.264"
+    background_layer: str
+    audio_waveform: bool
+    captions_layer: bool
+    hook_overlay: bool
+    image_transition: str
+    transition_duration: float
+    text_animation: str
+
+class SelectedClip(BaseModel):
+    clip_id: str
+    chunk_id: str
+    start: float
+    end: float
+    refined_start: float
+    refined_end: float
+    refined_duration: float
+    viral_score: float
+    reasoning: str
+    hook: str
+    captions: List[Caption]
+    reel_caption: str
+    hashtags: List[str]
+    tone: Tone
+    visual_beats: List[VisualBeat]
+    style: Style
+    assembly_spec: AssemblySpec
+
+class PodcastAnalysisResult(BaseModel):
+    chunks: List[Segment]
+    analysis: List[AnalysisMetrics]
+    selected_clips: List[SelectedClip]
+
 
 def create_analysis_prompt(transcript_entries: list, metadata: dict = None) -> str:
     """
     Create comprehensive prompt for 6-stage podcast analysis
-    
-    Args:
-        transcript_entries: List of transcript entries with timestamps, speakers, text
-        metadata: Optional dict with guest, topic, tone
     """
     
     # Format transcript for prompt
@@ -43,8 +121,8 @@ def create_analysis_prompt(transcript_entries: list, metadata: dict = None) -> s
         if metadata.get('tone'):
             context += f"Tone: {metadata['tone']}\n"
     
-    prompt = f"""You are a podcast content analyzer and viral clip strategist. Your role is to identify high-impact moments from podcast transcripts and plan their transformation into short-form vertical video content.
-
+    prompt = f"""You are a podcast content analyzer and viral clip strategist.
+    
 {context}
 
 ## TRANSCRIPT:
@@ -54,309 +132,84 @@ def create_analysis_prompt(transcript_entries: list, metadata: dict = None) -> s
 
 ## YOUR TASK:
 
-Analyze this podcast transcript through 6 stages and return a comprehensive JSON response.
+Analyze this podcast transcript through 6 stages and return a comprehensive structured response.
 
 ### STAGE 1: Semantic Chunking
-Parse the transcript into coherent segments (30–90 seconds each).
-
-**Chunking Rules:**
-- Preserve complete thoughts and stories
-- Break at natural conversation pauses
-- Never split mid-anecdote or mid-argument
-- Each chunk should be self-contained
-
-For each chunk, provide:
-- start_time (seconds)
-- end_time (seconds)
-- speakers (array of speaker names)
-- summary (1-2 sentence description)
-
----
+Parse the transcript into coherent segments (30–90 seconds each). Preserve complete thoughts.
 
 ### STAGE 2: Viral Potential Analysis
-For each chunk, evaluate viral potential.
-
-**Content Signals to Assess:**
-- Emotional peak (surprise, laughter, insight, controversy)
-- Quotability (memorable one-liner or soundbite)
-- Contrarian angle (challenges common wisdom)
-- Storytelling structure (setup → tension → payoff)
-- Standalone clarity (makes sense without context)
-
-**Platform Fit:**
-- Strong hook in first 3 seconds
-- Holds attention through 60 seconds
-- Invites engagement (comments, shares)
-
-**Scoring:**
-- Assign viral_score: 0.0–1.0 (where 1.0 is maximum viral potential)
-- Provide editorial_reasoning (2–3 sentences explaining the score)
-- Flag context_dependency (true/false - does it need prior context?)
-
----
+Evaluate viral potential (0.0–1.0). Look for emotional peaks, quotability, and contrarian angles.
 
 ### STAGE 3: Clip Refinement
-Select the top 3-5 chunks with highest viral scores and refine them.
-
-**Timing Adjustments:**
-- Tighten intro (cut filler words, setup fluff)
-- Preserve core insight/punchline
-- End on strong closing beat
-- Target 30–60 seconds (platform sweet spot)
-
-Provide refined:
-- refined_start (seconds)
-- refined_end (seconds)
-- refined_duration (seconds)
-
----
+Select the top 3-5 chunks. Tighten intro/outro. Target 30-60s.
 
 ### STAGE 4: Platform Optimization
-For each selected clip, generate platform-optimized content.
-
-**1. Hook (first 3 seconds)**
-- Pattern interrupt or provocative statement
-- Can be direct quote, question, or tension-builder
-- Example: "I lost $2M before I learned this..."
-
-**2. Captions (on-screen text)**
-- Break speech into 3–7 word chunks
-- Emphasize key words with CAPS or markers
-- Array of caption objects with: text, start_offset, end_offset, emphasis (array of emphasized words)
-
-**3. Reel Caption**
-- 1–2 sentence summary
-- Include 1–2 open-ended questions to drive comments
-
-**4. Hashtags**
-- 5–8 hashtags (mix of broad and niche)
-
-**5. Tone Adaptation**
-- pacing: "slow-burn" | "rapid-fire" | "conversational"
-- music_vibe: "energetic" | "reflective" | "tense" | "inspiring"
-
----
+Generate hooks, captions (with emphasis), hashtags, and social copy.
 
 ### STAGE 5: Visual Treatment Plan
-Design a minimal, repeatable visual system for each clip.
-
-**Visual Beats (3–5 per clip):**
-Each beat specifies:
-- image_concept: Abstract texture, symbolic object, or contextual scene
-  - Example: "Close-up of coffee cup on table" (grounding, casual)
-  - Example: "Abstract light rays" (insight, realization)
-- text_overlay: Which quote/keyword appears
-- motion: "zoom-in" | "zoom-out" | "pan-left" | "pan-right" | "fade" | "static"
-- motion_intensity: 2-5% for subtle, 5-10% for moderate
-- duration: 5–15 seconds
-
-**Style Consistency:**
-- color_palette: Array of 2–3 hex colors
-- typography: Font style description
-- composition: "rule-of-thirds" | "centered" | "lower-third"
-
----
+Design a visual system (beats, motion, style) for each clip.
 
 ### STAGE 6: Assembly Specification
-Provide technical build plan for each clip.
-
-**Technical Specs:**
-- aspect_ratio: "9:16"
-- resolution: "1080x1920"
-- fps: 30
-- audio_format: "AAC"
-- video_codec: "H.264"
-
-**Layer Structure (in order):**
-1. background_layer: "image" | "gradient" | "solid-color"
-2. audio_waveform: true/false (subtle visualization)
-3. captions_layer: Animated text
-4. hook_overlay: First 3 seconds
-
-**Motion Choreography:**
-- image_transition: "cross-dissolve" | "cut"
-- transition_duration: 0.5 seconds
-- text_animation: "fade-in" | "slide-up" | "typewriter"
-
----
-
-## OUTPUT FORMAT:
-
-Return ONLY valid JSON (no markdown, no code blocks) in this exact structure:
-
-```json
-{{
-  "chunks": [
-    {{
-      "chunk_id": "chunk_01",
-      "start_time": 15.0,
-      "end_time": 68.0,
-      "duration": 53.0,
-      "speakers": ["Joe Rogan", "Elon Musk"],
-      "summary": "Discussion about AI's transformative potential"
-    }}
-  ],
-  "analysis": [
-    {{
-      "chunk_id": "chunk_01",
-      "viral_score": 0.87,
-      "editorial_reasoning": "Strong contrarian take comparing AI to fire. Quotable moment with clear emotional peak. Works standalone.",
-      "context_dependency": false,
-      "emotional_peak": "insight",
-      "quotability": "It's more profound than electricity or fire",
-      "platform_fit": "Excellent hook potential, holds attention, invites debate"
-    }}
-  ],
-  "selected_clips": [
-    {{
-      "clip_id": "clip_01",
-      "chunk_id": "chunk_01",
-      "start": 15.0,
-      "end": 68.0,
-      "refined_start": 17.0,
-      "refined_end": 62.0,
-      "refined_duration": 45.0,
-      "viral_score": 0.87,
-      "reasoning": "Top viral potential due to provocative comparison and quotable insight",
-      
-      "hook": "AI is more profound than fire or electricity",
-      
-      "captions": [
-        {{
-          "text": "AI is MORE PROFOUND",
-          "start_offset": 0.0,
-          "end_offset": 2.5,
-          "emphasis": ["MORE PROFOUND"]
-        }},
-        {{
-          "text": "than electricity or FIRE",
-          "start_offset": 2.5,
-          "end_offset": 5.0,
-          "emphasis": ["FIRE"]
-        }}
-      ],
-      
-      "reel_caption": "Elon Musk explains why AI is humanity's most important invention. Do you agree? 🤔",
-      
-      "hashtags": ["#AI", "#ElonMusk", "#Technology", "#Future", "#Innovation", "#Podcast", "#Viral", "#DeepThoughts"],
-      
-      "tone": {{
-        "pacing": "conversational",
-        "music_vibe": "reflective"
-      }},
-      
-      "visual_beats": [
-        {{
-          "image_concept": "Abstract neural network visualization with glowing nodes",
-          "text_overlay": "AI is more profound than fire",
-          "motion": "zoom-in",
-          "motion_intensity": 3,
-          "duration": 8
-        }},
-        {{
-          "image_concept": "Close-up of circuit board with warm lighting",
-          "text_overlay": "It's going to amplify human capability",
-          "motion": "pan-right",
-          "motion_intensity": 2,
-          "duration": 7
-        }}
-      ],
-      
-      "style": {{
-        "color_palette": ["#1a1a2e", "#16213e", "#0f3460"],
-        "typography": "Bold sans-serif, high contrast",
-        "composition": "rule-of-thirds"
-      }},
-      
-      "assembly_spec": {{
-        "aspect_ratio": "9:16",
-        "resolution": "1080x1920",
-        "fps": 30,
-        "audio_format": "AAC",
-        "video_codec": "H.264",
-        "background_layer": "image",
-        "audio_waveform": true,
-        "captions_layer": true,
-        "hook_overlay": true,
-        "image_transition": "cross-dissolve",
-        "transition_duration": 0.5,
-        "text_animation": "fade-in"
-      }}
-    }}
-  ]
-}}
-```
-
-CRITICAL RULES:
-- Return ONLY the JSON object, no markdown formatting
-- All timestamps in seconds (float)
-- Viral scores between 0.0 and 1.0
-- Select 3-5 clips maximum (highest viral scores)
-- Be specific with visual concepts and motion details
-- Ensure hooks are attention-grabbing (first 3 seconds)
-- Make captions mobile-readable (3-7 words per chunk)
+Provide technical specs for automated editing.
 """
-    
     return prompt
 
 
 @retry(
     retry=retry_if_exception_type(ClientError),
-    stop=stop_after_attempt(5),
-    wait=wait_exponential(multiplier=2, min=4, max=60)
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=4, max=30)
 )
-def analyze_podcast_with_gemini(prompt: str) -> str:
-    """Call Gemini with HIGH thinking level for deep analysis"""
+def analyze_podcast_with_gemini(prompt: str) -> PodcastAnalysisResult:
+    """Call Gemini 2.0 Flash with Pydantic-based Structured Output"""
+    
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-flash-latest",
         contents=prompt,
         config=types.GenerateContentConfig(
-            response_mime_type="application/json"  # Request JSON response
+            response_mime_type="application/json",
+            response_schema=PodcastAnalysisResult,
         )
     )
-    return response.text
+    
+    # The response is already parsed into the Pydantic model by the SDK if using parsed fields,
+    # but here we are using the standard generate_content which returns an object that can be parsed.
+    # When response_schema is provided, the text is valid JSON guaranteed.
+    # We can parse it into our Pydantic model.
+    try:
+        data = json.loads(response.text)
+        return PodcastAnalysisResult(**data)
+    except Exception as e:
+        print(f"Error parsing Gemini response: {e}")
+        # In case of partial failure or model hallucination on schema (rare with 2.0 flash)
+        raise e
 
 
 def analyze_podcast(transcript_entries: list, metadata: dict = None) -> dict:
     """
-    Main analysis function - runs 6-stage pipeline
-    
-    Args:
-        transcript_entries: List of transcript entries from transcript_parser
-        metadata: Optional dict with guest, topic, tone
-    
-    Returns:
-        Complete analysis dict with all 6 stages
+    Main analysis function
     """
     print("Creating analysis prompt...")
     prompt = create_analysis_prompt(transcript_entries, metadata)
     
-    print("Analyzing podcast with Gemini (HIGH thinking)...")
+    print("Analyzing podcast with Gemini 3 Flash Preview (Structured Output)...")
     try:
-        result_text = analyze_podcast_with_gemini(prompt)
+        # Get Pydantic model result
+        result_model = analyze_podcast_with_gemini(prompt)
         
-        # Parse JSON response
-        result = json.loads(result_text)
+        # Convert back to dict for API response compatibility
+        result_dict = result_model.model_dump()
         
-        print(f"Analysis complete! Found {len(result.get('selected_clips', []))} viral clips.")
-        return result
+        print(f"Analysis complete! Found {len(result_dict.get('selected_clips', []))} viral clips.")
+        return result_dict
         
-    except json.JSONDecodeError as e:
-        print(f"JSON parsing error: {e}")
-        print(f"Raw response: {result_text[:500]}...")
-        # Return error structure
-        return {
-            "error": "Failed to parse JSON response",
-            "raw_response": result_text
-        }
     except Exception as e:
         print(f"Analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "error": str(e)
         }
-
-
-# Example usage
 if __name__ == "__main__":
     # Test with sample transcript entries
     sample_entries = [

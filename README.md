@@ -22,6 +22,7 @@ An AI-powered tool that transforms podcast transcripts into viral short-form vid
 - **Multi-Format Support**: Handles video files AND .txt, .srt, .vtt transcript files.
 - **Deep Editorial Context**: Accepts guest, topic, and tone metadata.
 - **Visual Blueprint**: Exports a complete JSON "recipe" for video editors (compatible with automation tools).
+- **Automated Clip Cutting**: Instantly slices and downloads viral clips as MP4s using FFmpeg.
 
 ## Quick Start
 
@@ -31,6 +32,7 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+brew install ffmpeg  # Required for clip cutting
 ```
 
 Create a `.env` file in the `backend/` folder:
@@ -57,7 +59,8 @@ npm run dev
 4. **OR Upload Transcript**: Upload a .txt, .srt, or .vtt file.
 5. Wait for the analysis to complete
 6. Review viral clips sorted by viral score
-7. Click any clip to view full details and export JSON
+7. Click any clip to view full details
+8. Hit **"Download Viral Clip (.MP4)"** to get your cut video instantly!
 
 ## Troubleshooting
 
@@ -66,6 +69,11 @@ If you assume a `RetryError` or `RESOURCE_EXHAUSTED` error:
 1.  **Check API Key**: Ensure your `GEMINI_API_KEY` in `backend/.env` is valid.
 2.  **Quota Limits**: The current configuration uses `gemini-2.5-flash` to conform to standard quotas. If you see quota errors, check your usage in [Google AI Studio](https://aistudio.google.com/).
 3.  **Restart Server**: Always restart `uvicorn` after changing the `.env` file.
+
+### "FFmpeg not found"
+If exporting clips fails:
+1.  Ensure FFmpeg is installed: `brew install ffmpeg` (Mac) or `sudo apt install ffmpeg` (Linux).
+2.  Restart the terminal/server after installation.
 
 ## Transcript Format Examples
 
@@ -106,6 +114,13 @@ Analyzes podcast transcript through 6-stage pipeline.
 **[NEW]** Direct video analysis using Multimodal Gemini 2.5.
 - `file` (required): Video file (.mp4, .mov, etc.)
 
+### POST /export-clip
+**[NEW]** Cuts and downloads a specific clip.
+- `source_file`: Path to original video
+- `start_time`: Start second
+- `end_time`: End second
+- `clip_id`: Output filename
+
 **Response:**
 ```json
 {
@@ -126,7 +141,7 @@ Analyzes podcast transcript through 6-stage pipeline.
 
 ## Tech Stack
 - **Frontend**: React, TypeScript, Vite, TailwindCSS, Lucide Icons
-- **Backend**: FastAPI, Python, Google GenAI SDK
+- **Backend**: FastAPI, Python, Google GenAI SDK, FFmpeg
 - **AI**: Gemini 2.5 Flash (Multimodal Video & Text Analysis)
 
 ## Sample Data
@@ -139,6 +154,7 @@ gemini-video-app/
 │   ├── main.py             # API Entry point & formatting
 │   ├── podcast_analyzer.py # Text-based 6-stage pipeline
 │   ├── video_analyzer.py   # [NEW] Multimodal Video Analysis pipeline
+│   ├── clip_cutter.py      # [NEW] FFmpeg video slicing logic
 │   ├── transcript_parser.py # Normalizes .txt/.srt/.vtt files
 │   └── requirements.txt    # Python dependencies
 ├── src/                    # React Frontend
@@ -154,7 +170,7 @@ gemini-video-app/
 - [x] **Core Analysis Engine**: 6-stage pipeline using Gemini 2.5 Flash.
 - [x] **Smart Parsing**: Support for multiple timestamp formats.
 - [x] **Video Upload Support**: Direct video processing using Gemini Multimodal capabilities.
+- [x] **One-Click Export**: Generate `.mp4` clips using FFmpeg on the backend.
 - [ ] **Creative Autopilot**: Image generation for B-roll (Pending Quota/Model Availability).
-- [ ] **One-Click Export**: Generate `.mp4` clips using FFmpeg on the backend.
 - [ ] **Social Integration**: Direct publishing to TikTok/Instagram APIs.
 

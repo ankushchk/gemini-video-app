@@ -1,10 +1,12 @@
 """
 Video Analyzer - Multimodal Analysis Pipeline
-Uses Gemini 2.5 Flash to watch/listen to video files directly
+Uses Gemini 3 Flash Preview (latest) with native Structured Outputs for reliability
 """
 import os
 import time
 import json
+from typing import List, Optional
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -13,6 +15,74 @@ load_dotenv()
 
 # Setup Gemini Client
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+# --- Pydantic Models for Structured Output ---
+
+# STAGE 1 MODELS
+class CandidateClip(BaseModel):
+    id: str
+    start_time: float
+    end_time: float
+    description: str
+
+class ScoutResult(BaseModel):
+    candidates: List[CandidateClip]
+
+# STAGE 2 MODELS
+class VideoChunk(BaseModel):
+    chunk_id: str
+    start_time: float
+    end_time: float
+    duration: float
+    speakers: List[str]
+    summary: str
+
+class ChunkAnalysis(BaseModel):
+    chunk_id: str
+    viral_score: float
+    editorial_reasoning: str
+    context_dependency: bool
+    platform_fit: str
+
+class VisualBeat(BaseModel):
+    image_concept: str
+    text_overlay: Optional[str] = None
+    motion: str
+    motion_intensity: int
+    duration: int
+
+class AssemblySpec(BaseModel):
+    aspect_ratio: str = "9:16"
+    resolution: str = "1080x1920"
+
+class Caption(BaseModel):
+    text: str
+    start_offset: float
+    end_offset: float
+    emphasis: List[str]
+
+class SelectedClip(BaseModel):
+    clip_id: str
+    chunk_id: str
+    start: float
+    end: float
+    refined_start: float
+    refined_end: float
+    refined_duration: float
+    viral_score: float
+    reasoning: str
+    hook: str
+    captions: List[Caption]
+    reel_caption: str
+    hashtags: List[str]
+    visual_beats: List[VisualBeat]
+    assembly_spec: AssemblySpec
+
+class VideoAnalysisResult(BaseModel):
+    chunks: List[VideoChunk]
+    analysis: List[ChunkAnalysis]
+    selected_clips: List[SelectedClip]
+
 
 def upload_to_gemini(path, mime_type=None):
     """Uploads the given file to Gemini."""
@@ -33,96 +103,49 @@ def wait_for_files_active(files):
             raise Exception(f"File {file.name} failed to process")
     print("...all files ready")
 
-def create_video_analysis_prompt() -> str:
+def create_draft_prompt() -> str:
     """
-    Create comprehensive prompt for video analysis.
-    Output schema MUST match the one in podcast_analyzer.py for frontend compatibility.
+    Stage 1: The Scout Agent
+    Focus: finding potential candidates with rough timestamps.
     """
-    return """You are a viral content strategist and video editor.
+    return """You are a podcast scout.
     
     YOUR TASK:
-    Watch/Listen to this video. Identify the top 3-5 most viral moments (30-60 seconds each).
-    Return a comprehensive JSON analysis.
+    Watch/Listen to this video. Identify 5 potential viral moments (30-60 seconds each).
+    Don't worry about perfect timing yet. Just find the best content hooks.
+    
+    Return a list of candidate clips.
+    """
 
-    For each clip, you must provide:
-    1. Timestamps (exact start/end seconds).
-    2. Viral Score (0.0-1.0) and Reasoning.
-    3. Platform Optimization (Hooks, Captions, Hashtags).
-    4. Visual Treatment (Describe what we are seeing or what b-roll to add).
+def create_verification_prompt(draft_clips_json: str) -> str:
+    """
+    Stage 2: The Senior Editor Agent
+    Focus: Precision timing and final output formatting.
+    """
+    return f"""You are a senior video editor.
+    
+    YOUR TASK:
+    Review these candidate clips from the scout:
+    {draft_clips_json}
 
-    OUTPUT FORMAT:
-    Return ONLY valid JSON in this exact structure:
+    1. VERIFY: Watch strictly within the proposed timestamps.
+    2. REFINE: 
+       - Adjust start/end times to valid sentence boundaries (don't cut words).
+       - Ensure duration is between 25-60 seconds.
+       - Discard any clips that are actually boring or low quality.
+    3. FINALIZE: Generate the full production schema.
 
-    ```json
-    {
-      "chunks": [
-        {
-          "chunk_id": "chunk_01",
-          "start_time": 0.0,
-          "end_time": 60.0,
-          "duration": 60.0,
-          "speakers": ["Speaker A"],
-          "summary": "Brief summary of this segment"
-        }
-      ],
-      "analysis": [
-        {
-          "chunk_id": "chunk_01",
-          "viral_score": 0.9,
-          "editorial_reasoning": "Strong emotional hook...",
-          "context_dependency": false,
-          "platform_fit": "Perfect for TikTok"
-        }
-      ],
-      "selected_clips": [
-        {
-          "clip_id": "clip_01",
-          "chunk_id": "chunk_01",
-          "start": 0.0,
-          "end": 60.0,
-          "refined_start": 2.0,
-          "refined_end": 58.0,
-          "refined_duration": 56.0,
-          "viral_score": 0.9,
-          "reasoning": "High energy...",
-          "hook": "You won't believe this...",
-          "captions": [
-            {
-              "text": "First phrase",
-              "start_offset": 0.0,
-              "end_offset": 2.0,
-              "emphasis": ["First"]
-            }
-          ],
-          "reel_caption": "Caption for the post...",
-          "hashtags": ["#viral"],
-          "visual_beats": [
-            {
-              "image_concept": "Description of visual",
-              "text_overlay": "Overlay text",
-              "motion": "zoom-in",
-              "motion_intensity": 5,
-              "duration": 5
-            }
-          ],
-          "assembly_spec": {
-            "aspect_ratio": "9:16",
-            "resolution": "1080x1920"
-          }
-        }
-      ]
-    }
-    ```
+    Return the final analysis including selected clips details.
     """
 
 def analyze_video_file(video_path: str) -> dict:
     """
-    Main function to analyze a video file.
+    Main function to analyze a video file using 2-Stage Agentic Loop.
     
     Args:
         video_path: Local path to the video file
     """
-    print(f"Starting video analysis for: {video_path}")
+    print(f"Starting AGENTIC video analysis for: {video_path}")
     
     try:
         # 1. Upload Video
@@ -131,28 +154,48 @@ def analyze_video_file(video_path: str) -> dict:
         # 2. Wait for processing
         wait_for_files_active([video_file])
         
-        # 3. Generate Content
-        prompt = create_video_analysis_prompt()
-        print("Requesting Gemini 2.5 Flash analysis...")
+        # --- STAGE 1: DRAFTING (The Scout) ---
+        print("🎬 Stage 1: The Scout (Drafting Candidates)...")
+        draft_prompt = create_draft_prompt()
         
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[video_file, prompt],
+        draft_response = client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=[video_file, draft_prompt],
             config=types.GenerateContentConfig(
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                response_schema=ScoutResult
             )
         )
         
-        # 4. Parse Response
-        result_text = response.text
-        try:
-            result = json.loads(result_text)
-            print(f"Analysis complete! Found {len(result.get('selected_clips', []))} clips.")
-            return result
-        except json.JSONDecodeError as e:
-            print(f"JSON parsing error: {e}")
-            return {"error": "Failed to parse JSON response", "raw_response": result_text}
+        # Parse result into Pydantic model
+        scout_result = ScoutResult(**json.loads(draft_response.text))
+        candidates = scout_result.candidates
+        print(f"Found {len(candidates)} candidate clips.")
+        
+        # --- STAGE 2: VERIFICATION (The Senior Editor) ---
+        print("🕵️ Stage 2: Senior Editor (Verifying & Refining)...")
+        # Dump candidates to JSON for the next prompt
+        verify_prompt = create_verification_prompt(scout_result.model_dump_json())
+        
+        final_response = client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=[video_file, verify_prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=VideoAnalysisResult
+            )
+        )
+        
+        # 4. Parse Final Response
+        final_result_model = VideoAnalysisResult(**json.loads(final_response.text))
+        final_dict = final_result_model.model_dump()
+        
+        final_count = len(final_dict.get('selected_clips', []))
+        print(f"Analysis complete! Final Approved Clips: {final_count}")
+        return final_dict
             
     except Exception as e:
         print(f"Video analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}

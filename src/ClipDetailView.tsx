@@ -231,22 +231,62 @@ export default function ClipDetailView({ clip, onClose }: ClipDetailViewProps) {
             </div>
           </div>
 
-          {/* Export Button */}
-          <button
-            onClick={() => {
-              const dataStr = JSON.stringify(clip, null, 2);
-              const dataBlob = new Blob([dataStr], { type: 'application/json' });
-              const url = URL.createObjectURL(dataBlob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `${clip?.clip_id || 'clip'}_spec.json`;
-              link.click();
-              URL.revokeObjectURL(url);
-            }}
-            className="w-full bg-white text-black py-3 rounded-lg font-medium hover:bg-neutral-200 transition-colors"
-          >
-            Export JSON Specification
-          </button>
+          {/* Export Buttons */}
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                const dataStr = JSON.stringify(clip, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${clip?.clip_id || 'clip'}_spec.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="flex-1 bg-neutral-800 text-white py-3 rounded-lg font-medium hover:bg-neutral-700 transition-colors border border-neutral-700"
+            >
+              Export JSON Specification
+            </button>
+
+            {clip.source_file && (
+              <button
+                onClick={async () => {
+                  const btn = document.getElementById('download-btn');
+                  if (btn) btn.innerText = 'Rendering Effects (10-30s)...';
+                  try {
+                    const formData = new FormData();
+                    formData.append('source_file', clip.source_file || '');
+                    // Send the full clip object so backend can render captions/effects
+                    formData.append('clip_data', JSON.stringify(clip));
+
+                    const res = await fetch('http://localhost:8000/export-clip', {
+                      method: 'POST',
+                      body: formData,
+                    });
+
+                    if (!res.ok) throw new Error('Export failed');
+
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${clip.clip_id}_rendered.mp4`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  } catch (e) {
+                    alert('Failed to export clip: ' + e);
+                  } finally {
+                    if (btn) btn.innerText = 'Download Viral Clip (.MP4)';
+                  }
+                }}
+                id="download-btn"
+                className="flex-1 bg-white text-black py-3 rounded-lg font-medium hover:bg-neutral-200 transition-colors"
+              >
+                Download Viral Clip (.MP4)
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

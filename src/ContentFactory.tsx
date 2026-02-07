@@ -78,8 +78,13 @@ export default function ContentFactory() {
 
       console.log('Analysis result:', data);
       
-      // Sort clips by viral score
-      const sortedClips = (data.selected_clips || []).sort((a, b) => b.viral_score - a.viral_score);
+      // Sort clips by viral score and add source file
+      const sortedClips = (data.selected_clips || [])
+        .sort((a, b) => b.viral_score - a.viral_score)
+        .map(clip => ({
+          ...clip,
+          source_file: data.source_file // Pass the video path to the clip
+        }));
       setClips(sortedClips);
 
     } catch (error) {

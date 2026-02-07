@@ -9,6 +9,9 @@ from typing import Optional
 from video_analyzer import analyze_video_file
 from transcript_parser import parse_transcript
 from podcast_analyzer import analyze_podcast
+from video_renderer import render_video_clip
+from fastapi.responses import FileResponse
+import json
 
 app = FastAPI()
 
@@ -27,8 +30,11 @@ async def upload_video(file: UploadFile = File(...)):
     Multimodal Video Analysis Endpoint
     Uses Gemini 2.5 Flash to watch and analyze video directly.
     """
-    # Save the file locally
-    file_location = f"temp_{file.filename}"
+    # Save the file locally - use a fixed name or manage sessions in production
+    # For Hackathon, we'll keep the original filename to reference it later for cutting
+    file_location = f"uploads/{file.filename}"
+    os.makedirs("uploads", exist_ok=True)
+    
     print(f"Receiving video upload: {file.filename}")
     
     try:
@@ -38,15 +44,54 @@ async def upload_video(file: UploadFile = File(...)):
         # Analyze video using new module
         result = analyze_video_file(file_location)
         
-        # Clean up temp file
-        if os.path.exists(file_location):
-            os.remove(file_location)
+        # Add the 'source_file' path to the result so the frontend knows what to cut later
+        # We return the RELATIVE path that the backend can understand
+        result["source_file"] = file_location
             
         return result
         
     except Exception as e:
         print(f"Error in upload_video: {e}")
         return {"error": str(e)}
+
+@app.post("/export-clip")
+async def export_clip(
+    source_file: str = Form(...),
+    clip_data: str = Form(...) # JSON string of the clip object
+):
+    """
+    Renders a clip with burned-in captions using FFmpeg.
+    """
+    try:
+        # Create 'exports' directory
+        os.makedirs("exports", exist_ok=True)
+        
+        # Parse clip data
+        clip = json.loads(clip_data)
+        clip_id = clip.get('clip_id', 'clip_unknown')
+        
+        output_filename = f"{clip_id}_rendered.mp4"
+        output_path = os.path.join("exports", output_filename)
+        
+        # Check if source exists
+        if not os.path.exists(source_file):
+            return {"error": f"Source file not found: {source_file}"}
+            
+        print(f"Requesting render for {clip_id}...")
+            
+        # Call the appropriate renderer (advanced)
+        # We ignore start_time/end_time form fields as they are in the JSON now
+        rendered_path = render_video_clip(source_file, clip, output_path)
+        
+        # Return the file
+        return FileResponse(rendered_path, media_type="video/mp4", filename=output_filename)
+        
+    except Exception as e:
+        print(f"Error exporting clip: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
 
 
 @app.post("/analyze-podcast")

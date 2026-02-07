@@ -45,6 +45,7 @@ export interface StyleSpec {
   color_palette: string[];
   typography: string;
   composition: 'rule-of-thirds' | 'centered' | 'lower-third';
+  source?: string;
 }
 
 export interface AssemblySpec {
@@ -80,6 +81,7 @@ export interface PodcastClip {
   visual_beats: VisualBeat[];
   style: StyleSpec;
   assembly_spec: AssemblySpec;
+  source_file?: string;
 }
 
 export interface PodcastAnalysisResult {
@@ -87,6 +89,7 @@ export interface PodcastAnalysisResult {
   analysis: ViralAnalysis[];
   selected_clips: PodcastClip[];
   error?: string;
+  source_file?: string;
 }
 
 export interface PodcastMetadata {

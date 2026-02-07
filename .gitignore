@@ -41,3 +41,7 @@ venv/
 .env.local
 .env.*.local
 
+
+# Uploads and Exports
+backend/uploads/
+backend/exports/
