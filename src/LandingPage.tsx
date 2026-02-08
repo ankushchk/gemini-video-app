@@ -28,15 +28,13 @@ export default function LandingPage({ onStart }: LandingPageProps) {
       <main className="pt-32 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
         
         {/* Badge */}
-        <div className="mb-8 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-800 bg-neutral-900/50 text-xs text-neutral-400">
+        <div className="mb-8 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-800 bg-neutral-900 text-xs text-neutral-400">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
           </span>
           Powered by Gemini 2.0 Flash
         </div>
 
-        {/* Main Headline with Highlight Animation */}
         <h1 className="text-5xl md:text-7xl font-light tracking-tight text-neutral-200 mb-8 max-w-4xl mx-auto leading-[1.1]">
           Turn long videos into
           <br />
@@ -49,7 +47,6 @@ export default function LandingPage({ onStart }: LandingPageProps) {
           </span>
           <span className="text-neutral-500">.</span>
         </h1>
-
         <p className="text-lg text-neutral-500 max-w-2xl mx-auto mb-12 font-light">
           Automatically extract, caption, and viral-score the best moments from your podcasts and videos. No more manual searching.
         </p>

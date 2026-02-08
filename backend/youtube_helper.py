@@ -1,7 +1,73 @@
 
 import re
+import requests
+import yt_dlp
+import os
 from urllib.parse import urlparse, parse_qs
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
+
+def download_youtube_video(video_url: str, output_dir: str = "uploads") -> str | None:
+    """
+    Downloads a YouTube video using yt-dlp.
+    Returns the path to the downloaded file.
+    """
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        
+        ydl_opts = {
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'outtmpl': f'{output_dir}/%(id)s.%(ext)s',
+            'quiet': True,
+            'no_warnings': True
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=True)
+            video_id = info['id']
+            ext = info['ext']
+            return f"{output_dir}/{video_id}.{ext}"
+            
+    except Exception as e:
+        print(f"Error downloading video: {e}")
+        return None
+
+def get_video_metadata(video_url: str) -> dict | None:
+    """
+    Fetches video metadata (title, duration, thumbnail) without downloading.
+    """
+    try:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'skip_download': True
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            return {
+                'title': info.get('title'),
+                'duration': info.get('duration'), # seconds
+                'thumbnail': info.get('thumbnail'),
+                'author': info.get('uploader'),
+                'video_id': info.get('id')
+            }
+    except Exception as e:
+        print(f"Error fetching metadata: {e}")
+        return None
+
+def get_video_title(video_url: str) -> str | None:
+    """
+    Fetches the video title using YouTube's oEmbed endpoint.
+    """
+    try:
+        oembed_url = f"https://www.youtube.com/oembed?url={video_url}&format=json"
+        response = requests.get(oembed_url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('title')
+        return None
+    except Exception as e:
+        print(f"Error fetching video title: {e}")
+        return None
 
 def extract_video_id(url: str) -> str | None:
     """

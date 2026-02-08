@@ -26,6 +26,7 @@ export interface Caption {
   start_offset: number;
   end_offset: number;
   emphasis: string[];
+  emoji?: string;
 }
 
 export interface ToneAdaptation {
@@ -82,11 +83,12 @@ export interface PodcastClip {
   style: StyleSpec;
   assembly_spec: AssemblySpec;
   source_file?: string;
+  thumbnail_path?: string;
 }
 
 export interface PodcastAnalysisResult {
-  chunks: TranscriptChunk[];
-  analysis: ViralAnalysis[];
+  chunks?: TranscriptChunk[];
+  analysis?: ViralAnalysis[];
   selected_clips: PodcastClip[];
   error?: string;
   source_file?: string;

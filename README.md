@@ -1,176 +1,167 @@
-# Podcast Content Analyzer
+# AI Viral Shorts Generator
 
-An AI-powered tool that transforms podcast transcripts into viral short-form video content using **Gemini 2.5 Flash** with deep reasoning capabilities.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
+![React](https://img.shields.io/badge/react-18+-61DAFB.svg)
+![Gemini](https://img.shields.io/badge/AI-Gemini%202.0%20Flash-orange)
 
-## Architecture
+## Project Overview
 
-![Architecture Diagram](./mermaid.svg)
+This application is an automated video processing pipeline designed to transform long-form video content (such as podcasts, interviews, and vlogs) into engaging, vertical short-form clips suitable for platforms like TikTok, Instagram Reels, and YouTube Shorts.
 
-## Features
+It leverages Google's Gemini 2.0 Flash multimodal AI to analyze video content, identify high-potential "viral" moments based on context and engagement, and automatically edit these segments. The system includes features for smart face tracking to keep speakers centered, AI-generated captions, and a comprehensive review dashboard for final touches.
 
-### 6-Stage Analysis Pipeline
-1. **Semantic Chunking** - Intelligently segments transcript into 30-90s coherent clips
-2. **Viral Potential Analysis** - Scores each segment (0.0-1.0) with editorial reasoning
-3. **Clip Refinement** - Optimizes timing and removes filler for maximum impact
-4. **Platform Optimization** - Generates hooks, captions, hashtags for social media
-5. **Visual Treatment Planning** - Creates shot lists with motion and style specs
-6. **Assembly Specification** - Provides technical build instructions for video editors
+## Key Features
 
-### Key Capabilities
-- **Multimodal Video Analysis**: Direct upload of `.mp4`, `.mov` files. Gemini "watches" the video to find viral moments.
-- **High-Speed Analysis**: Powered by Gemini 2.5 Flash for rapid processing.
-- **Multi-Format Support**: Handles video files AND .txt, .srt, .vtt transcript files.
-- **Deep Editorial Context**: Accepts guest, topic, and tone metadata.
-- **Visual Blueprint**: Exports a complete JSON "recipe" for video editors (compatible with automation tools).
-- **Automated Clip Cutting**: Instantly slices and downloads viral clips as MP4s using FFmpeg.
+- **Agentic AI Analysis**: Utilizes a two-stage AI pipeline ("Scout" and "Senior Editor") to scan videos for the best hooks and verify their viral potential.
+- **Smart Face Cropping**: automatically detects active speakers using MediaPipe and dynamically crops the video to a 9:16 vertical aspect ratio, keeping the subject centered.
+- **AI Captions**: Generates accurate captions with word-level highlighting for maximum viewer retention.
+- **Interactive Dashboard**: A web-based interface to review, edit, and refine clips before final export.
+- **User-Controlled Editing**:
+    - **Timeline Editor**: Fine-tune the start and end times of each clip with precision.
+    - **Subtitle Editor**: Manually correct transcript text, adjust timing, and customize caption burn-in.
+- **High-Performance Rendering**: Powered by FFmpeg for professional-grade video processing and rendering.
+- **Spam Filter**: Automatically filters out clips shorter than 15 seconds to ensure content quality.
 
-## Quick Start
+## System Architecture
 
-### 1. Backend Setup (Python)
+The following diagram illustrates the data flow from video upload to final clip generation:
+
+![System Architecture](./mermaid.svg)
+
+1.  **User Interface**: The React frontend handles file uploads and user interaction.
+2.  **API Layer**: The FastAPI backend receives the video and orchestrates the analysis.
+3.  **Analysis Engine**: The backend sends video data to Google Gemini 2.0 Flash, which returns a structured list of candidate clips.
+4.  **Rendering Engine**: Selected clips are processed by FFmpeg. MediaPipe is used for face detection coordinates, which inform the crop filter. Captions are generated as soft subtitles or burned in.
+5.  **Feedback Loop**: Users can review the generated clips and trigger re-renders with adjusted parameters.
+
+## Technology Stack
+
+- **Frontend**:
+    - React 18+
+    - TypeScript
+    - TailwindCSS (Styling)
+    - Vite (Build Tool)
+    - Lucide React (Icons)
+
+- **Backend**:
+    - Python 3.10+
+    - FastAPI (Web Framework)
+    - Uvicorn (ASGI Server)
+    - Pydantic (Data Validation)
+
+- **AI & Processing**:
+    - Google Gemini 2.0 Flash (via `google-genai` SDK)
+    - FFmpeg (Video Manipulation)
+    - OpenCV (Image Processing)
+    - MediaPipe (Face Detection)
+
+## Prerequisites
+
+Before setting up the project, ensure you have the following installed on your system:
+
+- **Python 3.10** or higher
+- **Node.js 18** or higher (with npm)
+- **FFmpeg**: Must be installed and accessible via the system command line (add to PATH).
+- **Google Gemini API Key**: You need a valid API key from Google AI Studio.
+
+## Installation Guide
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/viral-shorts-generator.git
+cd viral-shorts-generator
+```
+
+### 2. Backend Setup
+
+Navigate to the backend directory and set up the Python environment:
+
 ```bash
 cd backend
-python3 -m venv venv
+python -m venv venv
+
+# Activate the virtual environment
+# On macOS/Linux:
 source venv/bin/activate
+# On Windows:
+# venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-brew install ffmpeg  # Required for clip cutting
 ```
 
-Create a `.env` file in the `backend/` folder:
-```env
-GEMINI_API_KEY=your_api_key_here
-```
+### 3. Frontend Setup
 
-Start the server:
+Open a new terminal window, navigate to the project root, and install Node.js dependencies:
+
 ```bash
-python3 -m uvicorn main:app --reload --port 8000
-```
-
-### 2. Frontend Setup (React)
-```bash
-# In the root directory
 npm install
+```
+
+### 4. Configuration
+
+Create a configuration file to store your API key.
+
+1.  Create a file named `.env` in the `backend/` directory.
+2.  Add your Gemini API key to the file:
+
+```env
+GEMINI_API_KEY=your_actual_api_key_here
+```
+
+## Running the Application
+
+You need to run both the backend API server and the frontend development server simultaneously.
+
+### Start the Backend
+
+In your backend terminal (with the virtual environment activated):
+
+```bash
+cd backend
+python -m uvicorn main:app --reload --port 8000
+```
+
+The API will be available at `http://127.0.0.1:8000`.
+
+### Start the Frontend
+
+In your frontend terminal:
+
+```bash
 npm run dev
 ```
 
-### 3. Usage
-1. Open `http://localhost:5173`
-2. (Optional) Enter metadata: guest name, topic, tone
-3. **Upload Video**: Drag & drop an `.mp4` file to analyze visual & audio cues directly.
-4. **OR Upload Transcript**: Upload a .txt, .srt, or .vtt file.
-5. Wait for the analysis to complete
-6. Review viral clips sorted by viral score
-7. Click any clip to view full details
-8. Hit **"Download Viral Clip (.MP4)"** to get your cut video instantly!
+The application will launch in your default web browser at `http://localhost:5173`.
 
-## Troubleshooting
+## Usage Guide
 
-### "Analysis failed: RetryError" or 429 Errors
-If you assume a `RetryError` or `RESOURCE_EXHAUSTED` error:
-1.  **Check API Key**: Ensure your `GEMINI_API_KEY` in `backend/.env` is valid.
-2.  **Quota Limits**: The current configuration uses `gemini-2.5-flash` to conform to standard quotas. If you see quota errors, check your usage in [Google AI Studio](https://aistudio.google.com/).
-3.  **Restart Server**: Always restart `uvicorn` after changing the `.env` file.
-
-### "FFmpeg not found"
-If exporting clips fails:
-1.  Ensure FFmpeg is installed: `brew install ffmpeg` (Mac) or `sudo apt install ffmpeg` (Linux).
-2.  Restart the terminal/server after installation.
-
-## Transcript Format Examples
-
-### Plain Text (.txt)
-```
-[00:00:15] Joe Rogan: So you're telling me that AI is going to change everything?
-[00:00:22] Elon Musk: Absolutely. I think AI is the most important thing...
-```
-
-### SRT (.srt)
-```
-1
-00:00:15,000 --> 00:00:22,000
-Joe Rogan: So you're telling me that AI is going to change everything?
-
-2
-00:00:22,000 --> 00:00:30,000
-Elon Musk: Absolutely. I think AI is the most important thing...
-```
-
-### VTT (.vtt)
-```
-WEBVTT
-
-00:00:15.000 --> 00:00:22.000
-Joe Rogan: So you're telling me that AI is going to change everything?
-
-00:00:22.000 --> 00:00:30.000
-Elon Musk: Absolutely. I think AI is the most important thing...
-```
-
-## API Endpoints
-
-### POST /analyze-podcast
-Analyzes podcast transcript through 6-stage pipeline.
-
-### POST /upload-video
-**[NEW]** Direct video analysis using Multimodal Gemini 2.5.
-- `file` (required): Video file (.mp4, .mov, etc.)
-
-### POST /export-clip
-**[NEW]** Cuts and downloads a specific clip.
-- `source_file`: Path to original video
-- `start_time`: Start second
-- `end_time`: End second
-- `clip_id`: Output filename
-
-**Response:**
-```json
-{
-  "chunks": [...],
-  "analysis": [...],
-  "selected_clips": [
-    {
-      "clip_id": "clip_01",
-      "viral_score": 0.87,
-      "hook": "AI is more profound than fire",
-      "captions": [...],
-      "visual_beats": [...],
-      "assembly_spec": {...}
-    }
-  ]
-}
-```
-
-## Tech Stack
-- **Frontend**: React, TypeScript, Vite, TailwindCSS, Lucide Icons
-- **Backend**: FastAPI, Python, Google GenAI SDK, FFmpeg
-- **AI**: Gemini 2.5 Flash (Multimodal Video & Text Analysis)
-
-## Sample Data
+1.  **Select Video Source**: On the dashboard, you can either drag and drop an MP4 file or paste a YouTube URL.
+2.  **Configure Analysis**: Optionally, specify a "Topic Focus" (e.g., "Funny moments", "Technical explanation") to guide the AI.
+3.  **Analyze**: Click the "Analyze Video" button. The process may take 1-3 minutes depending on video length.
+4.  **Review Results**: Once analysis is complete, you will see a grid of generated clips.
+    - **Viral Score**: Indicates the predicted engagement level.
+    - **Reasoning**: Explains why the AI selected this segment.
+5.  **Edit Clip**:
+    - Click "Watch Reel" to preview the generated vertical video.
+    - Click "Edit Captions" to open the subtitle editor. make changes to text or timing, and click "Save & Burn" to re-render the video.
+6.  **Download**: Click the download icon on the video player to save the final MP4 file to your device.
 
 ## Project Structure
 
-```bash
-gemini-video-app/
-├── backend/                 # Python FastAPI Backend
-│   ├── main.py             # API Entry point & formatting
-│   ├── podcast_analyzer.py # Text-based 6-stage pipeline
-│   ├── video_analyzer.py   # [NEW] Multimodal Video Analysis pipeline
-│   ├── clip_cutter.py      # [NEW] FFmpeg video slicing logic
-│   ├── transcript_parser.py # Normalizes .txt/.srt/.vtt files
-│   └── requirements.txt    # Python dependencies
-├── src/                    # React Frontend
-│   ├── ContentFactory.tsx  # Main dashboard component
-│   ├── ClipDetailView.tsx  # Detailed view for specific clips
-│   └── types.ts            # TypeScript definitions for Analysis result
-├── public/                 # Static assets
-└── README.md               # Documentation
-```
+- `backend/main.py`: The entry point for the FastAPI application.
+- `backend/video_analyzer.py`: Contains the logic for interacting with Gemini and parsing the analysis results.
+- `backend/video_renderer.py`: Handles all FFmpeg operations, including cropping, resizing, and subtitle embedding.
+- `backend/face_tracker.py`: Implements the MediaPipe face detection logic.
+- `src/App.tsx`: The main React component structure.
+- `src/ContentFactory.tsx`: The core component for displaying and managing generated clips.
 
-## Roadmap
+## Contributing
 
-- [x] **Core Analysis Engine**: 6-stage pipeline using Gemini 2.5 Flash.
-- [x] **Smart Parsing**: Support for multiple timestamp formats.
-- [x] **Video Upload Support**: Direct video processing using Gemini Multimodal capabilities.
-- [x] **One-Click Export**: Generate `.mp4` clips using FFmpeg on the backend.
-- [ ] **Creative Autopilot**: Image generation for B-roll (Pending Quota/Model Availability).
-- [ ] **Social Integration**: Direct publishing to TikTok/Instagram APIs.
+Contributions are welcome. Please ensure that any pull requests include a detailed description of changes and test cases where applicable.
 
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.

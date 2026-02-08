@@ -42,6 +42,7 @@ class Caption(BaseModel):
     start_offset: float
     end_offset: float
     emphasis: List[str]
+    emoji: Optional[str] = Field(None, description="A single relevant emoji for this caption segment")
 
 class VisualBeat(BaseModel):
     image_concept: str
@@ -93,8 +94,8 @@ class SelectedClip(BaseModel):
     assembly_spec: AssemblySpec
 
 class PodcastAnalysisResult(BaseModel):
-    chunks: List[Segment]
-    analysis: List[AnalysisMetrics]
+    # chunks: List[Segment]  <-- REMOVED to save tokens
+    # analysis: List[AnalysisMetrics] <-- REMOVED to save tokens
     selected_clips: List[SelectedClip]
 
 
@@ -132,25 +133,25 @@ def create_analysis_prompt(transcript_entries: list, metadata: dict = None) -> s
 
 ## YOUR TASK:
 
-Analyze this podcast transcript through 6 stages and return a comprehensive structured response.
+Analyze this podcast transcript through 6 stages. 
+IMPORTANT: Perform the Chunking and Analysis steps internally (do not output them in JSON).
+ONLY return the final "selected_clips" list in the JSON response to save tokens.
 
-### STAGE 1: Semantic Chunking
-Parse the transcript into coherent segments (30–90 seconds each). Preserve complete thoughts.
-
-### STAGE 2: Viral Potential Analysis
-Evaluate viral potential (0.0–1.0). Look for emotional peaks, quotability, and contrarian angles.
+### STAGE 1 & 2: Semantic Chunking & Viral Analysis (Internal)
+Parse transcript into segments, evaluate viral potential (0.0-1.0).
+Select the top 3-5 viral moments.
 
 ### STAGE 3: Clip Refinement
-Select the top 3-5 chunks. Tighten intro/outro. Target 30-60s.
+Tighten intro/outro for the selected clips. Target 30-60s.
 
 ### STAGE 4: Platform Optimization
-Generate hooks, captions (with emphasis), hashtags, and social copy.
+Generate hooks, captions (with emphasis keywords and relevant emojis), hashtags, and social copy for the selected clips.
 
 ### STAGE 5: Visual Treatment Plan
-Design a visual system (beats, motion, style) for each clip.
+Design a visual system (beats, motion, style) for each selected clip.
 
 ### STAGE 6: Assembly Specification
-Provide technical specs for automated editing.
+Provide technical specs for automated editing of these clips.
 """
     return prompt
 
@@ -164,11 +165,13 @@ def analyze_podcast_with_gemini(prompt: str) -> PodcastAnalysisResult:
     """Call Gemini 2.0 Flash with Pydantic-based Structured Output"""
     
     response = client.models.generate_content(
-        model="gemini-flash-latest",
+        model="gemini-2.0-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=PodcastAnalysisResult,
+            max_output_tokens=8192, # Explicitly increase token limit
+            temperature=1.0, # Slightly creative but still structured
         )
     )
     
@@ -181,6 +184,10 @@ def analyze_podcast_with_gemini(prompt: str) -> PodcastAnalysisResult:
         return PodcastAnalysisResult(**data)
     except Exception as e:
         print(f"Error parsing Gemini response: {e}")
+        # Log the raw text to a file for debugging
+        with open("debug_failed_response.json", "w") as f:
+            f.write(response.text)
+        print("Saved failed JSON to debug_failed_response.json")
         # In case of partial failure or model hallucination on schema (rare with 2.0 flash)
         raise e
 
@@ -189,16 +196,38 @@ def analyze_podcast(transcript_entries: list, metadata: dict = None) -> dict:
     """
     Main analysis function
     """
+    # 3. Analyze with Gemini 2.0 Flash
     print("Creating analysis prompt...")
     prompt = create_analysis_prompt(transcript_entries, metadata)
     
-    print("Analyzing podcast with Gemini 3 Flash Preview (Structured Output)...")
+    print("Analyzing podcast with Gemini 2.0 Flash (Paid Tier)...") # Updated prompt log
     try:
         # Get Pydantic model result
         result_model = analyze_podcast_with_gemini(prompt)
         
         # Convert back to dict for API response compatibility
         result_dict = result_model.model_dump()
+        
+        # --- NEW: Generate Thumbnails for Top Clips ---
+        print("Generating viral thumbnails for clips...")
+        from image_generator import generate_viral_thumbnail
+        
+        # Process clips - maybe limit to top 3 to save cost/time, or all if user wants
+        for clip in result_dict.get('selected_clips', []):
+            try:
+                # Use summary as the visual prompt basis
+                print(f"Generating thumbnail for clip: {clip['clip_id']}")
+                visual_prompt = clip.get('description') or clip.get('summary') or "Viral moment"
+                topic = metadata.get('topic', 'General Podcast') if metadata else "General Podcast"
+                video_title = metadata.get('title') if metadata else None
+                
+                thumb_path = generate_viral_thumbnail(visual_prompt, topic, video_title)
+                if thumb_path:
+                    # Make path relative for frontend (remove backend/ prefix if present or ensure it handles uploads/)
+                    # Our UPLOAD_DIR is 'uploads', so path is 'uploads/thumb_....png'
+                    clip['thumbnail_path'] = thumb_path
+            except Exception as img_err:
+                print(f"Failed to generate thumbnail for {clip.get('clip_id')}: {img_err}")
         
         print(f"Analysis complete! Found {len(result_dict.get('selected_clips', []))} viral clips.")
         return result_dict

@@ -14,7 +14,13 @@ from video_renderer import render_video_clip
 from fastapi.responses import FileResponse
 import json
 
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI()
+
+# Mount uploads directory to serve generated thumbnails
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # IMPORTANT: This allows your React app (on port 5173) to talk to Python (on port 8000)
 app.add_middleware(
@@ -26,7 +32,14 @@ app.add_middleware(
 )
 
 @app.post("/upload-video")
-async def upload_video(file: UploadFile = File(...)):
+async def upload_video(
+    file: UploadFile = File(...),
+    transcript: Optional[UploadFile] = File(None),
+    start_time: Optional[float] = Form(None),
+    end_time: Optional[float] = Form(None),
+    topic: Optional[str] = Form(None),
+    caption_style: Optional[str] = Form(None)
+):
     """
     Multimodal Video Analysis Endpoint
     Uses Gemini 2.5 Flash to watch and analyze video directly.
@@ -41,9 +54,23 @@ async def upload_video(file: UploadFile = File(...)):
     try:
         with open(file_location, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+            
+        transcript_location = None
+        if transcript:
+            print(f"Receiving transcript upload: {transcript.filename}")
+            transcript_location = f"uploads/{transcript.filename}"
+            with open(transcript_location, "wb") as buffer:
+                shutil.copyfileobj(transcript.file, buffer)
         
         # Analyze video using new module
-        result = analyze_video_file(file_location)
+        result = analyze_video_file(
+            file_location, 
+            transcript_path=transcript_location,
+            start_time=start_time,
+            end_time=end_time,
+            topic=topic,
+            caption_style=caption_style
+        )
         
         # Add the 'source_file' path to the result so the frontend knows what to cut later
         # We return the RELATIVE path that the backend can understand
@@ -74,7 +101,16 @@ async def export_clip(
         output_filename = f"{clip_id}_rendered.mp4"
         output_path = os.path.join("exports", output_filename)
         
-        # Check if source exists
+        # Check if source exists or is a URL
+        if source_file.startswith("http"):
+            print(f"Source is a URL, downloading video: {source_file}")
+            from youtube_helper import download_youtube_video
+            downloaded_path = download_youtube_video(source_file)
+            if not downloaded_path:
+                return {"error": "Failed to download YouTube video for export."}
+            source_file = downloaded_path
+            print(f"Video downloaded to: {source_file}")
+            
         if not os.path.exists(source_file):
             return {"error": f"Source file not found: {source_file}"}
             
@@ -94,6 +130,53 @@ async def export_clip(
         return {"error": str(e)}
 
 
+
+@app.post("/render-vertical")
+async def render_vertical_endpoint(
+    source_file: str = Form(...),
+    clip_data: str = Form(...) 
+):
+    """
+    Renders a vertical 9:16 video clip (blur-fill) for Reels/TikTok.
+    Does NOT burn text (handled by frontend).
+    """
+    try:
+        # Create 'exports' directory
+        os.makedirs("exports", exist_ok=True)
+        
+        # Parse clip data
+        clip = json.loads(clip_data)
+        clip_id = clip.get('clip_id', 'clip_unknown')
+        
+        output_filename = f"{clip_id}_vertical.mp4"
+        output_path = os.path.join("exports", output_filename)
+        
+        # Check if source exists or is a URL
+        if source_file.startswith("http"):
+            # Reuse download logic (should be cached if hash matches, but for now simple check)
+            # The download_youtube_video function uses ID-based filenames so it acts as cache
+            from youtube_helper import download_youtube_video
+            downloaded_path = download_youtube_video(source_file)
+            if not downloaded_path:
+                return {"error": "Failed to download YouTube video."}
+            source_file = downloaded_path
+            
+        if not os.path.exists(source_file):
+            return {"error": f"Source file not found: {source_file}"}
+            
+        print(f"Requesting VERTICAL render for {clip_id}...")
+        
+        # Import dynamically to avoid circular imports if any
+        from video_renderer import render_vertical_video
+        
+        rendered_path = render_vertical_video(source_file, clip, output_path)
+        
+        # Return the file
+        return FileResponse(rendered_path, media_type="video/mp4", filename=output_filename)
+        
+    except Exception as e:
+        print(f"Error rendering vertical clip: {e}")
+        return {"error": str(e)}
 
 @app.post("/analyze-podcast")
 async def analyze_podcast_endpoint(
@@ -148,13 +231,27 @@ async def analyze_podcast_endpoint(
 
 
 
-from youtube_helper import get_youtube_transcript
+from youtube_helper import get_youtube_transcript, get_video_title
 
 class YouTubeRequest(BaseModel):
     video_url: str
     guest: Optional[str] = None
     topic: Optional[str] = None
     tone: Optional[str] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    caption_style: Optional[str] = None
+
+@app.post("/get-video-meta")
+async def get_video_meta_endpoint(request: YouTubeRequest):
+    """
+    Fast endpoint to get video metadata (title, duration, thumb) for the dashboard.
+    """
+    from youtube_helper import get_video_metadata
+    meta = get_video_metadata(request.video_url)
+    if not meta:
+        return {"error": "Failed to fetch metadata"}
+    return meta
 
 @app.post("/analyze-youtube")
 async def analyze_youtube_endpoint(request: YouTubeRequest):
@@ -165,7 +262,15 @@ async def analyze_youtube_endpoint(request: YouTubeRequest):
         print(f"Fetching transcript for: {request.video_url}")
         transcript = get_youtube_transcript(request.video_url)
         
-        # Convert transcript format from youtube-api to our format
+        # Filter transcript by start/end time if provided
+        if request.start_time is not None or request.end_time is not None:
+            start = request.start_time or 0
+            end = request.end_time or float('inf')
+            print(f"Trimming transcript to {start}-{end}s")
+            transcript = [
+                t for t in transcript 
+                if t['start'] + t['duration'] >= start and t['start'] <= end
+            ]
         # yt-api: [{'text': '...', 'start': 0.0, 'duration': 1.0}, ...]
         # our format: same structure is fine as long as keys match
         
@@ -191,6 +296,12 @@ async def analyze_youtube_endpoint(request: YouTubeRequest):
             metadata['tone'] = request.tone
             
         metadata['source_url'] = request.video_url
+        
+        # Try to get video title
+        video_title = get_video_title(request.video_url)
+        if video_title:
+            print(f"Found video title: {video_title}")
+            metadata['title'] = video_title
         
         # Analyze podcast
         result = analyze_podcast(transcript_entries, metadata if metadata else None)
