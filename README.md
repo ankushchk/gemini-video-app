@@ -28,6 +28,7 @@ It leverages Google's Gemini 2.0 Flash multimodal AI to analyze video content, i
 The following diagram illustrates the data flow from video upload to final clip generation:
 
 ![System Architecture](./mermaid.svg)
+<img width="4796" height="4541" alt="Untitled diagram-2026-02-09-174102" src="https://github.com/user-attachments/assets/fba7d65e-fba2-4900-a870-3fa945a682ad" />
 
 1.  **User Interface**: The React frontend handles file uploads and user interaction.
 2.  **API Layer**: The FastAPI backend receives the video and orchestrates the analysis.
